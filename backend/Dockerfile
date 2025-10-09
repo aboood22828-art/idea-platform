@@ -1,13 +1,13 @@
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# تعيين متغيرات البيئة
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Set work directory
+# تعيين مجلد العمل
 WORKDIR /app
 
-# Install system dependencies
+# تثبيت متطلبات النظام
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         postgresql-client \
@@ -15,22 +15,28 @@ RUN apt-get update \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# تثبيت المكتبات Python
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
 
-# Copy project
+# نسخ المشروع
 COPY . /app/
 
-# Create directories for static files and media
+# إنشاء مجلدات للملفات الثابتة والوسائط
 RUN mkdir -p /app/staticfiles /app/media /app/logs
 
-# Collect static files
+# تجميع الملفات الثابتة
 RUN python manage.py collectstatic --noinput || true
 
-# Expose port
+# إنشاء مستخدم غير جذر
+RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# فتح المنفذ
 EXPOSE 8000
 
-# Default command
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# الأمر الافتراضي
+CMD ["gunicorn", "idea_platform.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
 

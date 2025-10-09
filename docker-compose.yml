@@ -15,6 +15,7 @@ services:
       - "5432:5432"
     networks:
       - idea_network
+    restart: unless-stopped
 
   # Redis for Celery
   redis:
@@ -24,6 +25,7 @@ services:
       - "6379:6379"
     networks:
       - idea_network
+    restart: unless-stopped
 
   # Django Backend
   backend:
@@ -31,21 +33,27 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: idea_platform_backend
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn idea_platform.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - ./backend:/app
       - media_files:/app/media
+      - static_files:/app/staticfiles
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=True
+      - DEBUG=False
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     depends_on:
       - db
       - redis
     networks:
       - idea_network
+    restart: unless-stopped
 
   # Celery Worker
   celery:
@@ -58,7 +66,7 @@ services:
       - ./backend:/app
       - media_files:/app/media
     environment:
-      - DEBUG=True
+      - DEBUG=False
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
     depends_on:
@@ -66,6 +74,7 @@ services:
       - redis
     networks:
       - idea_network
+    restart: unless-stopped
 
   # Celery Beat (Scheduler)
   celery-beat:
@@ -78,7 +87,7 @@ services:
       - ./backend:/app
       - media_files:/app/media
     environment:
-      - DEBUG=True
+      - DEBUG=False
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
     depends_on:
@@ -86,6 +95,7 @@ services:
       - redis
     networks:
       - idea_network
+    restart: unless-stopped
 
   # React Frontend
   frontend:
@@ -93,23 +103,38 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: idea_platform_frontend
-    command: npm start
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000/api
     depends_on:
       - backend
     networks:
       - idea_network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: idea_platform_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_files:/var/www/static
+      - media_files:/var/www/media
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - idea_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   media_files:
+  static_files:
 
 networks:
   idea_network:

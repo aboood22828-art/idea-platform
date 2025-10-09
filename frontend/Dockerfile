@@ -1,20 +1,33 @@
-FROM node:18-alpine
+# مرحلة البناء
+FROM node:18-alpine as build
 
-# Set working directory
+# تعيين مجلد العمل
 WORKDIR /app
 
-# Copy package files
+# نسخ ملفات package
 COPY package*.json ./
 
-# Install dependencies
+# تثبيت المكتبات
 RUN npm ci --only=production
 
-# Copy source code
+# نسخ كود المشروع
 COPY . .
 
-# Expose port
-EXPOSE 3000
+# بناء المشروع للإنتاج
+RUN npm run build
 
-# Start the application
-CMD ["npm", "start"]
+# مرحلة الإنتاج
+FROM nginx:alpine
+
+# نسخ ملفات البناء إلى nginx
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# نسخ إعدادات nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# فتح المنفذ
+EXPOSE 80
+
+# تشغيل nginx
+CMD ["nginx", "-g", "daemon off;"]
 
