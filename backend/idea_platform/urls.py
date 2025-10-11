@@ -30,6 +30,9 @@ def api_root(request):
             'projects': '/api/projects/',
             'clients': '/api/clients/',
             'billing': '/api/billing/',
+            'reports': '/api/reports/',
+            'cms': '/api/cms/',
+            'social-media': '/api/social-media/',
             'admin': '/admin/',
         }
     })
@@ -41,6 +44,9 @@ urlpatterns = [
     # path('api/projects/', include('projects.urls')),
     # path('api/clients/', include('crm.urls')),
     # path('api/billing/', include('billing.urls')),
+    path('api/reports/', include('reports.urls')),
+    path('api/cms/', include('cms.urls')),
+    path('api/social-media/', include('social_media.urls')),
 ]
 
 # إضافة ملفات الوسائط في بيئة التطوير
