@@ -12,6 +12,9 @@ import ProjectsPage from './pages/ProjectsPage'
 import ClientsPage from './pages/ClientsPage'
 import InvoicesPage from './pages/InvoicesPage'
 import SettingsPage from './pages/SettingsPage'
+import ReportsPage from './pages/ReportsPage'
+import ContentManagementPage from './pages/ContentManagementPage'
+import SocialMediaPage from './pages/SocialMediaPage'
 
 // Layout
 import Layout from './components/Layout'
@@ -64,6 +67,30 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ReportsPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/cms" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentManagementPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/social-media" element={
+              <ProtectedRoute>
+                <Layout>
+                  <SocialMediaPage />
                 </Layout>
               </ProtectedRoute>
             } />

@@ -22,6 +22,8 @@ import {
   Menu,
   Bell,
   Search,
+  BarChart3,
+  MessageCircle,
 } from 'lucide-react'
 import { logoutUser } from '../store/slices/authSlice'
 import ideaLogo from '../assets/idea-logo.jpeg'
@@ -38,6 +40,9 @@ const Layout = ({ children }) => {
     { name: 'المشاريع', href: '/projects', icon: Briefcase },
     { name: 'العملاء', href: '/clients', icon: Users },
     { name: 'الفواتير', href: '/invoices', icon: FileText },
+    { name: 'التقارير', href: '/reports', icon: BarChart3 },
+    { name: 'إدارة المحتوى', href: '/cms', icon: FileText },
+    { name: 'وسائل التواصل', href: '/social-media', icon: MessageCircle },
     { name: 'الإعدادات', href: '/settings', icon: Settings },
   ]
 
