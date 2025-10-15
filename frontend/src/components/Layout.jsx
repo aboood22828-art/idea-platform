@@ -24,6 +24,8 @@ import {
   Search,
   BarChart3,
   MessageCircle,
+  Activity,
+  UserCog,
 } from 'lucide-react'
 import { logoutUser } from '../store/slices/authSlice'
 import ideaLogo from '../assets/idea-logo.jpeg'
@@ -43,6 +45,8 @@ const Layout = ({ children }) => {
     { name: 'التقارير', href: '/reports', icon: BarChart3 },
     { name: 'إدارة المحتوى', href: '/cms', icon: FileText },
     { name: 'وسائل التواصل', href: '/social-media', icon: MessageCircle },
+    { name: 'إدارة المستخدمين', href: '/users', icon: UserCog },
+    { name: 'سجل الأنشطة', href: '/activity-log', icon: Activity },
     { name: 'الإعدادات', href: '/settings', icon: Settings },
   ]
 

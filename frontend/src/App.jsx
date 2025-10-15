@@ -15,6 +15,8 @@ import SettingsPage from './pages/SettingsPage'
 import ReportsPage from './pages/ReportsPage'
 import ContentManagementPage from './pages/ContentManagementPage'
 import SocialMediaPage from './pages/SocialMediaPage'
+import UserManagementPage from './pages/UserManagementPage'
+import ActivityLogPage from './pages/ActivityLogPage'
 
 // Layout
 import Layout from './components/Layout'
@@ -88,6 +90,21 @@ function App() {
             } />
 
             <Route path="/social-media" element={
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <Layout>
+                  <UserManagementPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/activity-log" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ActivityLogPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
               <ProtectedRoute>
                 <Layout>
                   <SocialMediaPage />

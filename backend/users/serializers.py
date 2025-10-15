@@ -74,3 +74,78 @@ class UserActivitySerializer(serializers.ModelSerializer):
         fields = ['id', 'action', 'description', 'ip_address', 'user_agent', 'timestamp']
         read_only_fields = ['id', 'timestamp']
 
+
+
+
+class UserManagementSerializer(serializers.ModelSerializer):
+    """
+    Serializer لإدارة المستخدمين من قبل المديرين
+    """
+    full_name = serializers.SerializerMethodField()
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name', 'full_name',
+            'phone', 'role', 'role_display', 'avatar', 'bio', 'company_name',
+            'is_active', 'is_verified', 'email_notifications', 'sms_notifications',
+            'created_at', 'updated_at', 'last_login', 'last_login_ip'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'last_login', 'last_login_ip']
+    
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer لإنشاء مستخدم جديد من قبل المديرين
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    
+    class Meta:
+        model = User
+        fields = [
+            'email', 'username', 'first_name', 'last_name', 'password',
+            'phone', 'role', 'company_name', 'is_active', 'is_verified'
+        ]
+    
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer لتحديث بيانات المستخدم من قبل المديرين
+    """
+    class Meta:
+        model = User
+        fields = [
+            'first_name', 'last_name', 'phone', 'role', 'avatar', 'bio',
+            'company_name', 'is_active', 'is_verified', 'email_notifications',
+            'sms_notifications'
+        ]
+
+
+class UserActivityDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer مفصل لأنشطة المستخدمين
+    """
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    activity_type_display = serializers.CharField(source='get_activity_type_display', read_only=True)
+    
+    class Meta:
+        model = UserActivity
+        fields = [
+            'id', 'user', 'user_name', 'user_email', 'activity_type',
+            'activity_type_display', 'description', 'ip_address', 'user_agent',
+            'metadata', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+

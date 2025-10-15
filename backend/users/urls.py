@@ -1,6 +1,11 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+
+router = DefaultRouter()
+router.register(r'management', views.UserManagementViewSet, basename='user-management')
+router.register(r'activities', views.UserActivityViewSet, basename='user-activity')
 
 urlpatterns = [
     # المصادقة
@@ -11,9 +16,11 @@ urlpatterns = [
     
     # الملف الشخصي
     path('profile/', views.UserProfileView.as_view(), name='user_profile'),
-    path('activities/', views.user_activities, name='user_activities'),
     
     # للاختبار
     path('create-demo-user/', views.create_demo_user, name='create_demo_user'),
+    
+    # مسارات Router
+    path('', include(router.urls)),
 ]
 
