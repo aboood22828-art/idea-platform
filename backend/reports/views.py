@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, Avg, Q
+from django.db.models import Sum, Count, Avg, Q, F, Max, Case, When, Value, IntegerField, DecimalField, Prefetch
 from django.utils import timezone
 from datetime import timedelta
 
@@ -31,7 +31,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def generate_project_performance(self, request):
-        """توليد تقرير أداء المشاريع"""
+        """توليد تقرير أداء المشاريع مع تحسين الأداء"""
         start_date = request.data.get('start_date')
         end_date = request.data.get('end_date')
         
@@ -44,41 +44,50 @@ class ReportViewSet(viewsets.ModelViewSet):
             end_date=end_date
         )
         
-        # جمع بيانات المشاريع
+        # جمع بيانات المشاريع مع التصفية الصحيحة
         projects = Project.objects.all()
         if start_date:
             projects = projects.filter(start_date__gte=start_date)
         if end_date:
             projects = projects.filter(start_date__lte=end_date)
         
-        # إنشاء مقاييس لكل مشروع
+        # إنشاء مقاييس لكل مشروع باستخدام bulk_create لتحسين الأداء
+        metrics_to_create = []
+        current_date = timezone.now().date()
+        
         for project in projects:
-            # حساب نسبة الإنجاز (يمكن تحسينها بناءً على المهام الفعلية)
-            completion = 50  # قيمة افتراضية
-            
             # حساب الأيام المتبقية
             if project.end_date:
-                days_remaining = (project.end_date - timezone.now().date()).days
+                days_remaining = (project.end_date - current_date).days
             else:
                 days_remaining = 0
             
-            ProjectPerformanceMetric.objects.create(
-                project=project,
-                report=report,
-                completion_percentage=completion,
-                budget_used=project.budget * 0.5,  # قيمة افتراضية
-                tasks_completed=0,
-                tasks_total=0,
-                days_remaining=days_remaining,
-                is_on_track=days_remaining > 0
+            # حساب نسبة الإنجاز (يمكن تحسينها بناءً على المهام الفعلية)
+            # في المستقبل، يمكن استبدال هذا بمنطق حقيقي
+            completion = 50  # قيمة افتراضية
+            
+            metrics_to_create.append(
+                ProjectPerformanceMetric(
+                    project=project,
+                    report=report,
+                    completion_percentage=completion,
+                    budget_used=project.budget * 0.5,  # قيمة افتراضية
+                    tasks_completed=0,
+                    tasks_total=0,
+                    days_remaining=days_remaining,
+                    is_on_track=days_remaining > 0
+                )
             )
+        
+        # إنشاء جميع المقاييس دفعة واحدة
+        ProjectPerformanceMetric.objects.bulk_create(metrics_to_create, batch_size=100)
         
         serializer = self.get_serializer(report)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'])
     def generate_sales_report(self, request):
-        """توليد تقرير المبيعات"""
+        """توليد تقرير المبيعات مع تحسين الأداء"""
         start_date = request.data.get('start_date')
         end_date = request.data.get('end_date')
         
@@ -91,27 +100,35 @@ class ReportViewSet(viewsets.ModelViewSet):
             end_date=end_date
         )
         
-        # جمع بيانات المبيعات
+        # جمع بيانات المبيعات مع التصفية الصحيحة
         projects = Project.objects.all()
         if start_date:
             projects = projects.filter(start_date__gte=start_date)
         if end_date:
             projects = projects.filter(start_date__lte=end_date)
         
-        # حساب المقاييس الإجمالية
-        total_revenue = projects.aggregate(Sum('budget'))['budget__sum'] or 0
-        total_projects = projects.count()
-        completed_projects = projects.filter(status='completed').count()
-        active_projects = projects.filter(status='in_progress').count()
-        avg_project_value = projects.aggregate(Avg('budget'))['budget__avg'] or 0
+        # حساب المقاييس الإجمالية باستخدام aggregate واحد
+        stats = projects.aggregate(
+            total_revenue=Sum('budget'),
+            total_projects=Count('id'),
+            completed_projects=Count(
+                'id',
+                filter=Q(status='completed')
+            ),
+            active_projects=Count(
+                'id',
+                filter=Q(status='in_progress')
+            ),
+            avg_project_value=Avg('budget')
+        )
         
         SalesMetric.objects.create(
             report=report,
-            total_revenue=total_revenue,
-            total_projects=total_projects,
-            completed_projects=completed_projects,
-            active_projects=active_projects,
-            average_project_value=avg_project_value,
+            total_revenue=stats['total_revenue'] or 0,
+            total_projects=stats['total_projects'] or 0,
+            completed_projects=stats['completed_projects'] or 0,
+            active_projects=stats['active_projects'] or 0,
+            average_project_value=stats['avg_project_value'] or 0,
             period_start=start_date or timezone.now().date(),
             period_end=end_date or timezone.now().date()
         )
@@ -121,7 +138,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def generate_client_report(self, request):
-        """توليد تقرير العملاء"""
+        """توليد تقرير العملاء مع تحسين الأداء"""
         # إنشاء التقرير
         report = Report.objects.create(
             title=f"تقرير العملاء - {timezone.now().strftime('%Y-%m-%d')}",
@@ -129,61 +146,77 @@ class ReportViewSet(viewsets.ModelViewSet):
             created_by=request.user
         )
         
-        # جمع بيانات العملاء
-        clients = Client.objects.all()
+        # جمع بيانات العملاء باستخدام annotate لتجنب مشكلة N+1
+        clients = Client.objects.annotate(
+            total_projects=Count('project', distinct=True),
+            active_projects=Count(
+                'project',
+                filter=Q(project__status='in_progress'),
+                distinct=True
+            ),
+            completed_projects=Count(
+                'project',
+                filter=Q(project__status='completed'),
+                distinct=True
+            ),
+            total_spent=Sum('project__budget'),
+            last_project_date=Max('project__start_date')
+        )
         
+        # إنشاء مقاييس العملاء باستخدام البيانات المجمعة
+        metrics_to_create = []
         for client in clients:
-            projects = Project.objects.filter(client=client)
-            total_projects = projects.count()
-            active_projects = projects.filter(status='in_progress').count()
-            completed_projects = projects.filter(status='completed').count()
-            total_spent = projects.aggregate(Sum('budget'))['budget__sum'] or 0
-            
-            # الحصول على تاريخ آخر مشروع
-            last_project = projects.order_by('-start_date').first()
-            last_project_date = last_project.start_date if last_project else None
-            
-            ClientMetric.objects.create(
-                report=report,
-                client=client,
-                total_projects=total_projects,
-                active_projects=active_projects,
-                completed_projects=completed_projects,
-                total_spent=total_spent,
-                satisfaction_score=8.0,  # قيمة افتراضية
-                last_project_date=last_project_date
+            metrics_to_create.append(
+                ClientMetric(
+                    report=report,
+                    client=client,
+                    total_projects=client.total_projects or 0,
+                    active_projects=client.active_projects or 0,
+                    completed_projects=client.completed_projects or 0,
+                    total_spent=client.total_spent or 0,
+                    satisfaction_score=8.0,  # يمكن تحسينها لاحقًا
+                    last_project_date=client.last_project_date
+                )
             )
+        
+        # إنشاء جميع المقاييس دفعة واحدة لتحسين الأداء
+        ClientMetric.objects.bulk_create(metrics_to_create, batch_size=100)
         
         serializer = self.get_serializer(report)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
-        """إحصائيات لوحة التحكم"""
-        # إحصائيات المشاريع
-        total_projects = Project.objects.count()
-        active_projects = Project.objects.filter(status='in_progress').count()
-        completed_projects = Project.objects.filter(status='completed').count()
+        """إحصائيات لوحة التحكم مع تحسين الأداء"""
+        # إحصائيات مجمعة في استعلام واحد
+        current_month_start = timezone.now().replace(day=1)
         
-        # إحصائيات العملاء
+        stats = Project.objects.aggregate(
+            total_projects=Count('id'),
+            active_projects=Count(
+                'id',
+                filter=Q(status='in_progress')
+            ),
+            completed_projects=Count(
+                'id',
+                filter=Q(status='completed')
+            ),
+            total_revenue=Sum('budget'),
+            monthly_projects=Count(
+                'id',
+                filter=Q(start_date__gte=current_month_start)
+            )
+        )
+        
         total_clients = Client.objects.count()
         
-        # إحصائيات مالية
-        total_revenue = Project.objects.aggregate(Sum('budget'))['budget__sum'] or 0
-        
-        # مشاريع الشهر الحالي
-        current_month_start = timezone.now().replace(day=1)
-        monthly_projects = Project.objects.filter(
-            start_date__gte=current_month_start
-        ).count()
-        
         return Response({
-            'total_projects': total_projects,
-            'active_projects': active_projects,
-            'completed_projects': completed_projects,
+            'total_projects': stats['total_projects'] or 0,
+            'active_projects': stats['active_projects'] or 0,
+            'completed_projects': stats['completed_projects'] or 0,
             'total_clients': total_clients,
-            'total_revenue': total_revenue,
-            'monthly_projects': monthly_projects
+            'total_revenue': stats['total_revenue'] or 0,
+            'monthly_projects': stats['monthly_projects'] or 0
         })
 
 
