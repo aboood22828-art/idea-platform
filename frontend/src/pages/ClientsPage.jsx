@@ -1,84 +1,124 @@
-import { useState, useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Plus,
+  Search,
+  Filter,
   MoreHorizontal,
   Mail,
   Phone,
   Building,
   Users,
   TrendingUp,
-  UserCheck
-} from 'lucide-react'
-import { fetchClients, fetchLeads } from '../store/slices/clientsSlice'
+  UserCheck,
+  AlertCircle // Added for error messages
+} from 'lucide-react';
+import { fetchClients, fetchLeads } from '../store/slices/clientsSlice';
 
 const ClientsPage = () => {
-  const dispatch = useDispatch()
-  const { clients, leads, loading } = useSelector((state) => state.clients)
-  const [searchTerm, setSearchTerm] = useState('')
+  const dispatch = useDispatch();
+  const { clients, leads, loading, error: clientsError } = useSelector((state) => state.clients);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  const resetMessages = () => {
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  const memoizedFetchClients = useCallback(() => {
+    dispatch(fetchClients());
+  }, [dispatch]);
+
+  const memoizedFetchLeads = useCallback(() => {
+    dispatch(fetchLeads());
+  }, [dispatch]);
 
   useEffect(() => {
-    dispatch(fetchClients())
-    dispatch(fetchLeads())
-  }, [dispatch])
+    resetMessages();
+    memoizedFetchClients();
+    memoizedFetchLeads();
+  }, [memoizedFetchClients, memoizedFetchLeads]);
 
-  const filteredClients = clients.filter(client =>
-    client.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const filteredLeads = leads.filter(lead =>
-    lead.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'default'
-      case 'inactive': return 'secondary'
-      default: return 'outline'
+  useEffect(() => {
+    if (clientsError) {
+      setError(`خطأ في جلب البيانات: ${clientsError}`);
     }
-  }
+  }, [clientsError]);
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'active': return 'نشط'
-      case 'inactive': return 'غير نشط'
-      default: return 'غير محدد'
-    }
-  }
+  const filteredClients = useMemo(() => {
+    return clients.filter(client =>
+      client.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [clients, searchTerm]);
 
-  const getLeadStatusColor = (status) => {
-    switch (status) {
-      case 'new': return 'default'
-      case 'contacted': return 'secondary'
-      case 'qualified': return 'outline'
-      case 'converted': return 'default'
-      default: return 'outline'
-    }
-  }
+  const filteredLeads = useMemo(() => {
+    return leads.filter(lead =>
+      lead.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [leads, searchTerm]);
 
-  const getLeadStatusText = (status) => {
+  const getStatusColor = useCallback((status) => {
     switch (status) {
-      case 'new': return 'جديد'
-      case 'contacted': return 'تم التواصل'
-      case 'qualified': return 'مؤهل'
-      case 'converted': return 'تم التحويل'
-      default: return 'غير محدد'
+      case 'active': return 'default';
+      case 'inactive': return 'secondary';
+      default: return 'outline';
     }
-  }
+  }, []);
+
+  const getStatusText = useCallback((status) => {
+    switch (status) {
+      case 'active': return 'نشط';
+      case 'inactive': return 'غير نشط';
+      default: return 'غير محدد';
+    }
+  }, []);
+
+  const getLeadStatusColor = useCallback((status) => {
+    switch (status) {
+      case 'new': return 'default';
+      case 'contacted': return 'secondary';
+      case 'qualified': return 'outline';
+      case 'converted': return 'default';
+      default: return 'outline';
+    }
+  }, []);
+
+  const getLeadStatusText = useCallback((status) => {
+    switch (status) {
+      case 'new': return 'جديد';
+      case 'contacted': return 'تم التواصل';
+      case 'qualified': return 'مؤهل';
+      case 'converted': return 'تم التحويل';
+      default: return 'غير محدد';
+    }
+  }, []);
+
+  // Placeholder for future actions like adding client/lead
+  const handleAddClient = () => {
+    resetMessages();
+    setSuccessMessage('تم فتح نموذج إضافة عميل جديد (هذه ميزة وهمية)');
+    // Actual logic to open a modal or navigate to a form
+  };
+
+  const handleAddLead = () => {
+    resetMessages();
+    setSuccessMessage('تم فتح نموذج إضافة عميل محتمل جديد (هذه ميزة وهمية)');
+    // Actual logic to open a modal or navigate to a form
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -87,27 +127,41 @@ const ClientsPage = () => {
             إدارة العملاء والعملاء المحتملين
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Button variant="outline" onClick={handleAddLead}>
             <Plus className="ml-2 h-4 w-4" />
             عميل محتمل
           </Button>
-          <Button>
+          <Button onClick={handleAddClient}>
             <Plus className="ml-2 h-4 w-4" />
             عميل جديد
           </Button>
         </div>
       </div>
 
+      {/* Error and Success Messages */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">خطأ! </strong>
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">نجاح! </strong>
+          <span className="block sm:inline">{successMessage}</span>
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي العملاء</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{clients.length}</div>
+            <div className="text-2xl font-bold">{loading ? '...' : clients.length}</div>
           </CardContent>
         </Card>
         
@@ -118,7 +172,7 @@ const ClientsPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {clients.filter(c => c.status === 'active').length}
+              {loading ? '...' : clients.filter(c => c.status === 'active').length}
             </div>
           </CardContent>
         </Card>
@@ -129,7 +183,7 @@ const ClientsPage = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{leads.length}</div>
+            <div className="text-2xl font-bold">{loading ? '...' : leads.length}</div>
           </CardContent>
         </Card>
         
@@ -139,7 +193,7 @@ const ClientsPage = () => {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">75%</div>
+            <div className="text-2xl font-bold">{loading ? '...' : '75%'}</div> {/* Placeholder for dynamic calculation */}
           </CardContent>
         </Card>
       </div>
@@ -173,6 +227,7 @@ const ClientsPage = () => {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {loading ? (
               <div className="col-span-full text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <div className="text-muted-foreground">جاري تحميل العملاء...</div>
               </div>
             ) : filteredClients.length > 0 ? (
@@ -230,7 +285,7 @@ const ClientsPage = () => {
             ) : (
               <div className="col-span-full text-center py-12">
                 <div className="text-muted-foreground mb-4">لا توجد عملاء مطابقون للبحث</div>
-                <Button>
+                <Button onClick={handleAddClient}>
                   <Plus className="ml-2 h-4 w-4" />
                   إضافة عميل جديد
                 </Button>
@@ -244,6 +299,7 @@ const ClientsPage = () => {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {loading ? (
               <div className="col-span-full text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <div className="text-muted-foreground">جاري تحميل العملاء المحتملين...</div>
               </div>
             ) : filteredLeads.length > 0 ? (
@@ -301,7 +357,7 @@ const ClientsPage = () => {
             ) : (
               <div className="col-span-full text-center py-12">
                 <div className="text-muted-foreground mb-4">لا توجد عملاء محتملون مطابقون للبحث</div>
-                <Button>
+                <Button onClick={handleAddLead}>
                   <Plus className="ml-2 h-4 w-4" />
                   إضافة عميل محتمل
                 </Button>
@@ -311,8 +367,8 @@ const ClientsPage = () => {
         </TabsContent>
       </Tabs>
     </div>
-  )
-}
+  );
+};
 
-export default ClientsPage
+export default ClientsPage;
 
