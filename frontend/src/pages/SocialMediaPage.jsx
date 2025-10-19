@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Twitter, Facebook, Instagram, Linkedin, Youtube,
-  Plus, Send, Calendar, BarChart2, TrendingUp, MessageCircle
+  Plus, Send, Calendar, BarChart2, TrendingUp, MessageCircle, AlertCircle
 } from 'lucide-react';
 import api from '../utils/api';
 
@@ -10,6 +10,8 @@ const SocialMediaPage = () => {
   const [posts, setPosts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [activeTab, setActiveTab] = useState('posts');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [newPost, setNewPost] = useState({
@@ -18,66 +20,78 @@ const SocialMediaPage = () => {
     scheduled_at: ''
   });
 
-  useEffect(() => {
-    fetchAccounts();
-    fetchPosts();
-    fetchCampaigns();
-  }, []);
+  const resetMessages = () => {
+    setError(null);
+    setSuccessMessage(null);
+  };
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       const response = await api.get('/api/social-media/accounts/');
       setAccounts(response.data);
     } catch (error) {
       console.error('خطأ في جلب الحسابات:', error);
-    } finally {
-      setLoading(false);
+      setError('فشل في جلب الحسابات. يرجى المحاولة مرة أخرى.');
     }
-  };
+  }, []);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       const response = await api.get('/api/social-media/posts/');
       setPosts(response.data);
     } catch (error) {
       console.error('خطأ في جلب المنشورات:', error);
+      setError('فشل في جلب المنشورات. يرجى المحاولة مرة أخرى.');
     }
-  };
+  }, []);
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
       const response = await api.get('/api/social-media/campaigns/');
       setCampaigns(response.data);
     } catch (error) {
       console.error('خطأ في جلب الحملات:', error);
+      setError('فشل في جلب الحملات. يرجى المحاولة مرة أخرى.');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    resetMessages();
+    Promise.all([fetchAccounts(), fetchPosts(), fetchCampaigns()]).finally(() => setLoading(false));
+  }, [fetchAccounts, fetchPosts, fetchCampaigns]);
 
   const handleCreatePost = async () => {
+    resetMessages();
+    if (!newPost.account || !newPost.content) {
+      setError("يرجى تحديد الحساب وإدخال محتوى للمنشور.");
+      return;
+    }
     try {
       await api.post('/api/social-media/posts/', newPost);
       fetchPosts();
       setShowNewPostModal(false);
       setNewPost({ account: '', content: '', scheduled_at: '' });
-      alert('تم إنشاء المنشور بنجاح');
+      setSuccessMessage('تم إنشاء المنشور بنجاح!');
     } catch (error) {
       console.error('خطأ في إنشاء المنشور:', error);
-      alert('فشل في إنشاء المنشور');
+      setError('فشل في إنشاء المنشور. يرجى التحقق من البيانات والمحاولة مرة أخرى.');
     }
   };
 
   const handlePublishPost = async (postId) => {
+    resetMessages();
     try {
       await api.post(`/api/social-media/posts/${postId}/publish/`);
       fetchPosts();
-      alert('تم نشر المنشور بنجاح');
+      setSuccessMessage('تم نشر المنشور بنجاح!');
     } catch (error) {
       console.error('خطأ في نشر المنشور:', error);
-      alert('فشل في نشر المنشور');
+      setError('فشل في نشر المنشور. يرجى المحاولة مرة أخرى.');
     }
   };
 
-  const getPlatformIcon = (platform) => {
+  const getPlatformIcon = useCallback((platform) => {
     const icons = {
       twitter: <Twitter className="h-5 w-5" />,
       facebook: <Facebook className="h-5 w-5" />,
@@ -85,10 +99,10 @@ const SocialMediaPage = () => {
       linkedin: <Linkedin className="h-5 w-5" />,
       youtube: <Youtube className="h-5 w-5" />
     };
-    return icons[platform] || <Twitter className="h-5 w-5" />;
-  };
+    return icons[platform] || <MessageCircle className="h-5 w-5" />;
+  }, []);
 
-  const getPlatformColor = (platform) => {
+  const getPlatformColor = useCallback((platform) => {
     const colors = {
       twitter: 'bg-blue-500',
       facebook: 'bg-blue-600',
@@ -97,9 +111,9 @@ const SocialMediaPage = () => {
       youtube: 'bg-red-600'
     };
     return colors[platform] || 'bg-gray-500';
-  };
+  }, []);
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = useCallback((status) => {
     const statusConfig = {
       draft: { color: 'bg-gray-100 text-gray-800', label: 'مسودة' },
       scheduled: { color: 'bg-yellow-100 text-yellow-800', label: 'مجدول' },
@@ -113,7 +127,7 @@ const SocialMediaPage = () => {
         {config.label}
       </span>
     );
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -133,7 +147,7 @@ const SocialMediaPage = () => {
             <p className="text-gray-600">إدارة حساباتك ومنشوراتك على منصات التواصل الاجتماعي</p>
           </div>
           <button 
-            onClick={() => setShowNewPostModal(true)}
+            onClick={() => { resetMessages(); setShowNewPostModal(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-5 w-5" />
@@ -141,6 +155,20 @@ const SocialMediaPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Error and Success Messages */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">خطأ! </strong>
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">نجاح! </strong>
+          <span className="block sm:inline">{successMessage}</span>
+        </div>
+      )}
 
       {/* Connected Accounts */}
       <div className="mb-8">
@@ -153,7 +181,7 @@ const SocialMediaPage = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {accounts.map((account) => (
               <div key={account.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -162,11 +190,11 @@ const SocialMediaPage = () => {
                       {getPlatformIcon(account.platform)}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{account.account_name}</h3>
-                      <p className="text-sm text-gray-600">{account.platform}</p>
+                      <h3 className="font-semibold text-gray-900 truncate">{account.account_name}</h3>
+                      <p className="text-sm text-gray-600 capitalize">{account.platform}</p>
                     </div>
                   </div>
-                  <div className={`w-3 h-3 rounded-full ${account.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <div className={`w-3 h-3 rounded-full ${account.is_active ? 'bg-green-500' : 'bg-gray-300'}`} title={account.is_active ? 'فعال' : 'غير فعال'} />
                 </div>
                 <div className="text-sm text-gray-600">
                   <p>المنشورات: {account.posts_count || 0}</p>
@@ -180,7 +208,7 @@ const SocialMediaPage = () => {
       {/* Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex gap-6">
+          <nav className="-mb-px flex gap-6" aria-label="Tabs">
             <button
               onClick={() => setActiveTab('posts')}
               className={`pb-4 px-1 border-b-2 font-medium text-sm ${
@@ -224,16 +252,16 @@ const SocialMediaPage = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد منشورات</h3>
               <p className="text-gray-600 mb-4">ابدأ بإنشاء منشور جديد</p>
               <button 
-                onClick={() => setShowNewPostModal(true)}
+                onClick={() => { resetMessages(); setShowNewPostModal(true); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 إنشاء منشور
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {posts.map((post) => (
-                <div key={post.id} className="bg-white rounded-lg shadow p-6">
+                <div key={post.id} className="bg-white rounded-lg shadow p-6 flex flex-col">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${getPlatformColor(post.account?.platform)} text-white`}>
@@ -241,21 +269,21 @@ const SocialMediaPage = () => {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">{post.account_name}</h3>
-                        <p className="text-sm text-gray-600">{post.platform}</p>
+                        <p className="text-sm text-gray-600 capitalize">{post.platform}</p>
                       </div>
                     </div>
                     {getStatusBadge(post.status)}
                   </div>
                   
-                  <p className="text-gray-700 mb-4 line-clamp-3">{post.content}</p>
+                  <p className="text-gray-700 mb-4 flex-grow line-clamp-3">{post.content}</p>
                   
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                    {post.scheduled_at && (
+                    {post.scheduled_at ? (
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        {new Date(post.scheduled_at).toLocaleString('ar-SA')}
+                        <span>{new Date(post.scheduled_at).toLocaleString('ar-SA')}</span>
                       </div>
-                    )}
+                    ) : <span></span>}
                   </div>
                   
                   {post.status === 'draft' && (
@@ -299,34 +327,10 @@ const SocialMediaPage = () => {
 
       {/* Campaigns Tab */}
       {activeTab === 'campaigns' && (
-        <div>
-          {campaigns.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <BarChart2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد حملات</h3>
-              <p className="text-gray-600 mb-4">ابدأ بإنشاء حملة تسويقية جديدة</p>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                إنشاء حملة
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {campaigns.map((campaign) => (
-                <div key={campaign.id} className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{campaign.name}</h3>
-                  <p className="text-gray-600 mb-4">{campaign.description}</p>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">المنشورات: {campaign.posts_count}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      campaign.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {campaign.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <BarChart2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد حملات بعد</h3>
+          <p className="text-gray-600">هذه الميزة قيد التطوير. يمكنك إنشاء حملات تسويقية وتتبعها من هنا قريباً.</p>
         </div>
       )}
 
@@ -335,7 +339,7 @@ const SocialMediaPage = () => {
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <TrendingUp className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">التحليلات قريباً</h3>
-          <p className="text-gray-600">سيتم إضافة تحليلات مفصلة للأداء قريباً</p>
+          <p className="text-gray-600">سيتم إضافة تحليلات مفصلة لأداء حساباتك ومنشوراتك قريباً.</p>
         </div>
       )}
 
@@ -347,10 +351,11 @@ const SocialMediaPage = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="account-select" className="block text-sm font-medium text-gray-700 mb-2">
                   الحساب
                 </label>
                 <select
+                  id="account-select"
                   value={newPost.account}
                   onChange={(e) => setNewPost({...newPost, account: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -365,10 +370,11 @@ const SocialMediaPage = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="post-content" className="block text-sm font-medium text-gray-700 mb-2">
                   المحتوى
                 </label>
                 <textarea
+                  id="post-content"
                   value={newPost.content}
                   onChange={(e) => setNewPost({...newPost, content: e.target.value})}
                   rows={4}
@@ -378,10 +384,11 @@ const SocialMediaPage = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="scheduled-time" className="block text-sm font-medium text-gray-700 mb-2">
                   موعد النشر (اختياري)
                 </label>
                 <input
+                  id="scheduled-time"
                   type="datetime-local"
                   value={newPost.scheduled_at}
                   onChange={(e) => setNewPost({...newPost, scheduled_at: e.target.value})}
@@ -393,7 +400,8 @@ const SocialMediaPage = () => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleCreatePost}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+                disabled={!newPost.account || !newPost.content}
               >
                 إنشاء
               </button>
